@@ -1,1120 +1,754 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="hi">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>QR Rebuilder + Printer (ZPL/TSPL/EPL)</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  
-  :root{
-    --bg: #0a0e17;
-    --bg-secondary: #0f1419;
-    --card: linear-gradient(145deg, #1a1f2e 0%, #151a26 100%);
-    --card-border: rgba(99, 102, 241, 0.15);
-    --text: #e8eaed;
-    --text-muted: #9ca3af;
-    --text-dim: #6b7280;
-    --accent: #6366f1;
-    --accent-hover: #7c3aed;
-    --accent-glow: rgba(99, 102, 241, 0.35);
-    --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.1);
-    --danger: #f43f5e;
-    --danger-bg: rgba(244, 63, 94, 0.1);
-    --warn: #f59e0b;
-    --warn-bg: rgba(245, 158, 11, 0.12);
-    --border: rgba(255, 255, 255, 0.08);
-    --shadow: rgba(0, 0, 0, 0.5);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:'Inter',system-ui,-apple-system,sans-serif;
-    background:var(--bg);color:var(--text);min-height:100vh;
-    background-image:
-      radial-gradient(at 0% 0%, rgba(99,102,241,.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(124,58,237,.1) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(16,185,129,.08) 0px, transparent 50%);
-    background-attachment:fixed;
-  }
-  header{
-    padding:1.25rem 1rem;border-bottom:1px solid var(--border);
-    background:var(--bg-secondary);backdrop-filter:blur(20px);position:sticky;top:0;z-index:1000;
-  }
-  .header-wrap{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:16px}
-  .brand{flex:1 1 auto}
-  .brand h1{
-    font-size:1.85rem;font-weight:800;margin:0;
-    background:linear-gradient(135deg,#6366f1 0%,#a855f7 50%,#ec4899 100%);
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-    letter-spacing:-.02em;
-  }
-  .brand p{color:var(--text-muted);font-size:.9rem;margin-top:.15rem}
-  .tabs{
-    display:flex;gap:8px;align-items:center;justify-content:flex-end;flex:0 0 auto;
-  }
-  .tab{
-    padding:.6rem 1rem;border-radius:12px;border:1px solid var(--border);
-    background:rgba(255,255,255,.06);color:var(--text);font-weight:700;cursor:pointer;
-    transition:.2s ease; user-select:none; white-space:nowrap;
-  }
-  .tab:hover{background:rgba(255,255,255,.1)}
-  .tab.active{
-    background:var(--accent);color:white;border-color:transparent;
-    box-shadow:0 0 0 1px var(--accent-glow), 0 8px 18px rgba(99,102,241,.35);
-  }
-
-  .wrap{max-width:1400px;margin:0 auto;padding:1.25rem}
-
-  /* ===== Existing Builder styles (unchanged) ===== */
-  .uploader{
-    background: var(--card);
-    border: 2px solid var(--card-border);
-    border-radius: 24px;
-    padding: 2rem;
-    display: flex;
-    gap: 1.5rem;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    box-shadow: 0 10px 40px var(--shadow);
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
-  }
-  .uploader::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.5;
-  }
-  .left{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;flex:1}
-  .btn{
-    appearance:none;border:0;background:var(--accent);color:#fff;padding:.875rem 1.25rem;border-radius:14px;
-    font-weight:600;font-size:.95rem;cursor:pointer;user-select:none;transition:.2s cubic-bezier(.4,0,.2,1);
-    box-shadow:0 4px 12px rgba(99,102,241,.3);position:relative;overflow:hidden;
-  }
-  .btn.secondary{background:rgba(255,255,255,.08);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.1);border:1px solid var(--border)}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn.off{opacity:.3;pointer-events:none}
-  .hint{color:var(--text-muted);font-size:.875rem;font-weight:500;display:flex;align-items:center;gap:.5rem}
-  .sizeInput,.textInput,.select{
-    padding:.75rem 1rem;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.3);
-    color:var(--text);font-family:inherit;font-size:.9rem;font-weight:500;transition:.2s ease all;
-  }
-  .sizeInput{width:120px}.textInput{min-width:240px}.select{min-width:160px;cursor:pointer}
-  .rows{margin-top:2.0rem;display:grid;gap:2rem}
-  .rowTitle{font-size:1.125rem;font-weight:700;color:var(--text);margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;letter-spacing:-.01em}
-  .rowTitle::before{content:'';width:4px;height:24px;background:linear-gradient(180deg,var(--accent),var(--accent-hover));border-radius:4px;box-shadow:0 0 10px var(--accent-glow)}
-  .gallery{display:flex;gap:1.25rem;overflow-x:auto;padding:1rem .5rem;scroll-behavior:smooth}
-  .tile{background:var(--card);border:1px solid var(--card-border);border-radius:20px;padding:1.25rem;min-width:280px;max-width:340px;box-shadow:0 8px 24px var(--shadow);transition:.3s;animation:fadeIn .4s ease forwards}
-  .thumb{aspect-ratio:1/1;background:rgba(0,0,0,.4);border-radius:16px;display:grid;place-items:center;overflow:hidden;border:1px solid var(--border);position:relative}
-  .thumb img{max-width:100%;display:block;height:auto}
-  .name{margin-top:1rem;font-size:.9rem;font-weight:600;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .status{font-size:.875rem;margin-top:.75rem;padding:.5rem .75rem;border-radius:10px;font-weight:600;display:inline-block}
-  .status.ok{color:var(--success);background:var(--success-bg)}
-  .status.err{color:var(--danger);background:var(--danger-bg)}
-  .links{display:flex;gap:.625rem;flex-wrap:wrap;margin-top:1rem}
-  .dl{font-size:.8rem;padding:.625rem 1rem;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);text-decoration:none;font-weight:600;transition:.2s ease all;display:flex;align-items:center;gap:.375rem}
-  .dl::before{content:'⬇';font-size:1rem}
-  .dl:hover{background:var(--accent);color:#fff;transform:translateY(-2px);box-shadow:0 4px 12px rgba(99,102,241,.3)}
-  .dataPanel{margin-top:2rem;background:var(--card);border:1px solid var(--card-border);border-radius:20px;padding:1.25rem;box-shadow:0 8px 24px var(--shadow)}
-  table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden}
-  th,td{border-bottom:1px solid var(--border);padding:1rem 1.25rem;text-align:left;font-size:.9rem}
-  th{color:var(--text);background:rgba(99,102,241,.1);font-weight:700;text-transform:uppercase;font-size:.8rem;letter-spacing:.05em}
-  td{color:var(--text-muted);font-weight:500;word-break:break-word}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-
-  /* ===== Printer tab layout ===== */
-  .hidden{display:none !important}
-  .printer-grid{display:grid;grid-template-columns:340px 1fr;gap:16px;margin-top:16px}
-  .card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;box-shadow:0 8px 24px var(--shadow);padding:14px}
-  .card h3{margin:.2rem 0 10px;font-size:1.05rem}
-  .g{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
-  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
-  .pill{display:inline-block;padding:.2rem .5rem;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.06);font-size:.8rem;color:var(--text-muted)}
-  .ok{color:var(--success);background:var(--success-bg);border-color:transparent;padding:.2rem .45rem;border-radius:8px}
-  .warn{color:var(--warn);background:var(--warn-bg);border-color:transparent;padding:.2rem .45rem;border-radius:8px}
-  canvas#labelPreview{width:100%;height:auto;background:#fff;border-radius:12px;border:1px solid #ddd}
-</style>
-
-<!-- libs (existing) -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-<!-- QZ Tray (for direct raw printing) -->
-<script src="https://demo.qz.io/js/qz-tray.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Web QR Code Enhancer</title>
+  <!-- Tailwind (CDN JIT) for a modern glassy UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            glass: 'rgba(255,255,255,0.12)',
+            ink: '#0f172a'
+          },
+          boxShadow: {
+            glow: '0 10px 30px rgba(0,0,0,0.25)'
+          },
+          backdropBlur: {
+            xs: '2px'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html, body { background: radial-gradient(1200px 600px at 10% 10%, #0b1220, #0a0f1a 45%, #070b13); color: #e8eef9; }
+    .glass { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); backdrop-filter: blur(8px); }
+    .chip { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.16); }
+    .scrollbar::-webkit-scrollbar { height: 10px; width: 10px; }
+    .scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 999px; }
+    .scrollbar::-webkit-scrollbar-track { background: transparent; }
+  </style>
+  <!-- ZXing for QR decode -->
+  <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
+  <!-- qr-code-styling for SVG generation -->
+  <script src="https://unpkg.com/qr-code-styling@1.6.0/lib/qr-code-styling.js"></script>
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF + autotable for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body>
-
-<header>
-  <div class="header-wrap">
-    <div class="brand">
-      <h1>✨ QR Rebuilder</h1>
-      <p>3mm outer margin • Type-wise ZIP (PNG/JPG/SVG) • Excel/CSV export • ZPL/TSPL/EPL Bulk Printing</p>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="sticky top-0 z-40 glass shadow-glow">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <h1 class="text-xl md:text-2xl font-semibold tracking-tight">QR Code Enhancer</h1>
+      <div class="flex items-center gap-2 text-xs opacity-80">
+        <span class="px-2 py-1 chip rounded-full">100% Client-side</span>
+        <span class="px-2 py-1 chip rounded-full">SVG→PNG/JPG</span>
+        <span class="px-2 py-1 chip rounded-full">Live Preview</span>
+      </div>
     </div>
-    <div class="tabs">
-      <button id="tabBtnBuilder" class="tab active">QR Builder</button>
-      <button id="tabBtnPrinter" class="tab">QR Printer</button>
+  </header>  <!-- Main layout -->  <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Left: Controls -->
+    <section class="lg:col-span-4 glass rounded-2xl p-4 shadow-glow">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Inputs & Settings</h2>
+        <label class="inline-flex items-center gap-2 text-sm cursor-pointer">
+          <input id="darkToggle" type="checkbox" class="accent-cyan-400" checked>
+          <span>Glassy Dark</span>
+        </label>
+      </div><!-- File input -->
+  <div class="space-y-3">
+    <label class="block text-sm opacity-90">Upload multiple QR images (JPG/PNG/SVG, etc.)</label>
+    <input id="fileInput" type="file" accept="image/*,.svg" multiple class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:text-cyan-200 hover:file:bg-cyan-500/30" />
+    <p class="text-xs opacity-70">Tip: Drag & drop भी कर सकते हैं।</p>
+  </div>
+
+  <hr class="my-4 border-white/10"/>
+
+  <!-- Global caption -->
+  <div class="space-y-2">
+    <label class="text-sm">Global Caption</label>
+    <input id="globalCaption" type="text" placeholder="उदा. ABC" class="w-full glass rounded-xl px-3 py-2 outline-none" />
+    <p class="text-xs opacity-70">ये caption सभी entries पर auto-apply होगा; table में specific entry पर बदल सकते हैं।</p>
+  </div>
+
+  <hr class="my-4 border-white/10"/>
+
+  <!-- Size & quality -->
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="text-sm">QR Size</label>
+      <div class="flex gap-2 mt-1">
+        <input id="qrSizeValue" type="number" value="256" min="64" class="w-full glass rounded-xl px-3 py-2 outline-none" />
+        <select id="qrSizeUnit" class="glass rounded-xl px-2">
+          <option value="px">px</option>
+          <option value="mm">mm</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="text-sm">PNG/JPG DPI</label>
+      <input id="dpi" type="number" value="300" min="72" class="w-full glass rounded-xl px-3 py-2 outline-none" />
     </div>
   </div>
-</header>
 
-<div class="wrap">
+  <hr class="my-4 border-white/10"/>
 
-  <!-- ===================== TAB: BUILDER (UNCHANGED) ===================== -->
-  <section id="tab-builder">
-    <!-- (EXISTING BUILDER UI — left exactly as earlier; nothing changed) -->
-    <div class="uploader" id="dropZone">
-      <div class="left">
-        <label id="browseLabel" class="btn secondary" for="fileInput" role="button" tabindex="0">📁 Browse Images</label>
-        <input id="fileInput" type="file" accept="image/*" multiple hidden />
-        <div class="hint" id="fileList">No files selected</div>
-
-        <label class="hint" for="captionInput">✏️ Caption:</label>
-        <input id="captionInput" class="textInput" placeholder="Enter caption (optional)" />
-
-        <label class="hint" for="manualInput">🔗/📝 Text or URL:</label>
-        <input id="manualInput" class="textInput" placeholder="Paste URL or type any text" />
-        <button id="addManualBtn" class="btn secondary" title="Generate QR from the above text/URL">➕ Add</button>
-
-        <div class="hint">📐 Output:
-          <input id="outSize" class="sizeInput" type="number" value="1024" min="256" step="64" /> px
-        </div>
-      </div>
-      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-        <select id="zipType" class="select">
-          <option value="png" selected>📦 ZIP: PNG</option>
-          <option value="jpg">📦 ZIP: JPG</option>
-          <option value="svg">📦 ZIP: SVG</option>
+  <!-- Code (6 letters) styling -->
+  <details class="glass rounded-xl p-3" open>
+    <summary class="cursor-pointer select-none font-medium">Code Styling (link के बाद 6 letters)</summary>
+    <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+      <div>
+        <label>Font Family</label>
+        <select id="codeFont" class="glass rounded-xl px-2 py-1 w-full">
+          <option>Inter</option>
+          <option>Montserrat</option>
+          <option>Roboto Mono</option>
+          <option>Nunito</option>
         </select>
-        <button id="zipBtn" class="btn secondary" disabled>📦 Download ZIP</button>
-        <button id="excelBtn" class="btn secondary" disabled>📊 Excel</button>
-        <button id="csvBtn" class="btn secondary" disabled>📄 CSV</button>
-        <button id="resetBtn" class="btn secondary" disabled>🔄 Reset</button>
-        <button id="processBtn" class="btn" disabled>⚡ Process</button>
-      </div>
-    </div>
-
-    <div class="rows">
-      <div>
-        <div class="rowTitle">📸 Original Images</div>
-        <div class="gallery" id="origRow"></div>
       </div>
       <div>
-        <div class="rowTitle">✨ Enhanced QR (Code + Caption)</div>
-        <div class="gallery" id="enhRow"></div>
+        <label>Font Size (pt)</label>
+        <input id="codeFontSize" type="number" value="12" min="6" class="glass rounded-xl px-2 py-1 w-full"/>
+      </div>
+      <div>
+        <label>Weight</label>
+        <select id="codeWeight" class="glass rounded-xl px-2 py-1 w-full">
+          <option value="400">Normal</option>
+          <option value="600">SemiBold</option>
+          <option value="700" selected>Bold</option>
+        </select>
+      </div>
+      <div>
+        <label>Style</label>
+        <select id="codeStyle" class="glass rounded-xl px-2 py-1 w-full">
+          <option value="normal">Normal</option>
+          <option value="italic">Italic</option>
+        </select>
+      </div>
+      <div>
+        <label>Code-QR Gap (mm)</label>
+        <input id="gapCode" type="number" value="2" min="0" class="glass rounded-xl px-2 py-1 w-full"/>
+      </div>
+      <div>
+        <label>Text Color</label>
+        <input id="codeColor" type="color" value="#e8eef9" class="glass rounded-xl px-2 py-1 w-full"/>
       </div>
     </div>
+  </details>
 
-    <div class="dataPanel" id="dataPanel" hidden>
-      <div class="hint">Decoded Data Preview</div>
-      <div style="overflow:auto">
-        <table id="dataTable">
-          <thead><tr><th>#</th><th>🔗 Link</th><th>🔤 Code (6 letters)</th><th>✏️ Caption</th></tr></thead>
-          <tbody></tbody>
-        </table>
+  <details class="glass rounded-xl p-3 mt-3" open>
+    <summary class="cursor-pointer select-none font-medium">Caption Styling</summary>
+    <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+      <div>
+        <label>Font Family</label>
+        <select id="capFont" class="glass rounded-xl px-2 py-1 w-full">
+          <option>Inter</option>
+          <option>Montserrat</option>
+          <option>Roboto Mono</option>
+          <option>Nunito</option>
+        </select>
+      </div>
+      <div>
+        <label>Font Size (pt)</label>
+        <input id="capFontSize" type="number" value="10" min="6" class="glass rounded-xl px-2 py-1 w-full"/>
+      </div>
+      <div>
+        <label>Weight</label>
+        <select id="capWeight" class="glass rounded-xl px-2 py-1 w-full">
+          <option value="400" selected>Normal</option>
+          <option value="600">SemiBold</option>
+          <option value="700">Bold</option>
+        </select>
+      </div>
+      <div>
+        <label>Style</label>
+        <select id="capStyle" class="glass rounded-xl px-2 py-1 w-full">
+          <option value="normal" selected>Normal</option>
+          <option value="italic">Italic</option>
+        </select>
+      </div>
+      <div>
+        <label>Code-Caption Gap (mm)</label>
+        <input id="gapCaption" type="number" value="1.5" min="0" class="glass rounded-xl px-2 py-1 w-full"/>
+      </div>
+      <div>
+        <label>Text Color</label>
+        <input id="capColor" type="color" value="#c7d2fe" class="glass rounded-xl px-2 py-1 w-full"/>
       </div>
     </div>
-  </section>
-
-  <!-- ===================== TAB: PRINTER ===================== -->
-  <section id="tab-printer" class="hidden">
-    <div class="printer-grid">
-      <!-- LEFT: setup -->
-      <div class="card">
-        <h3>🖨️ Printer & Connection</h3>
-        <div class="row">
-          <select id="ddlLang" class="select" title="Language">
-            <option value="ZPL" selected>ZPL (Zebra)</option>
-            <option value="TSPL">TSPL (TSC/BPLA)</option>
-            <option value="EPL">EPL (Eltron/BPLE)</option>
-          </select>
-          <span class="pill">203 dpi default</span>
-        </div>
-        <div class="g">
-          <button id="btnQzConnect" class="btn secondary">🔗 Connect QZ Tray</button>
-          <button id="btnQzRefresh" class="btn secondary" disabled>🔄 Refresh Printers</button>
-        </div>
-        <div class="row">
-          <select id="ddlPrinters" class="select" disabled></select>
-        </div>
-        <div id="qzStatus" class="row"><span class="pill">Status: Not connected</span></div>
-
-        <hr style="border:0;border-top:1px solid var(--border);margin:12px 0" />
-
-        <h3>📄 Label Setup</h3>
-        <div class="g3">
-          <div class="row"><span class="hint">Width (mm)</span><input id="lbWmm" class="sizeInput" type="number" value="100" min="10" step="1"></div>
-          <div class="row"><span class="hint">Height (mm)</span><input id="lbHmm" class="sizeInput" type="number" value="150" min="10" step="1"></div>
-          <div class="row"><span class="hint">DPI</span><input id="dpi" class="sizeInput" type="number" value="203" min="150" step="1"></div>
-        </div>
-        <div class="g3">
-          <div class="row"><span class="hint">Gap (mm)</span><input id="gapmm" class="sizeInput" type="number" value="3" min="0" step="0.5"></div>
-          <div class="row"><span class="hint">Speed (ips)</span><input id="speed" class="sizeInput" type="number" value="4" min="1" max="6"></div>
-          <div class="row"><span class="hint">Darkness</span><input id="dark" class="sizeInput" type="number" value="10" min="0" max="15"></div>
-        </div>
-        <div class="g3">
-          <div class="row"><span class="hint">Rotate</span>
-            <select id="rotate" class="select">
-              <option value="0" selected>0°</option><option value="90">90°</option><option value="180">180°</option>
-            </select>
-          </div>
-          <div class="row"><span class="hint">Outer L/R (mm)</span><input id="mLR" class="sizeInput" type="number" value="3" min="0" step="0.5"></div>
-          <div class="row"><span class="hint">Outer T/B (mm)</span><input id="mTB" class="sizeInput" type="number" value="3" min="0" step="0.5"></div>
-        </div>
-
-        <hr style="border:0;border-top:1px solid var(--border);margin:12px 0" />
-
-        <h3>🎨 Shape / Border</h3>
-        <div class="g3">
-          <div class="row"><span class="hint">Shape</span>
-            <select id="shape" class="select">
-              <option value="none">None</option>
-              <option value="square" selected>Square</option>
-              <option value="rounded">Rounded rectangle</option>
-              <option value="current">Current (no change)</option>
-            </select>
-          </div>
-          <div class="row"><span class="hint">Border (px/dots)</span><input id="border" class="sizeInput" type="number" value="4" min="0" step="1"></div>
-          <div class="row"><span class="hint">Corner radius (mm)</span><input id="radiusmm" class="sizeInput" type="number" value="3" min="0" step="0.5"></div>
-        </div>
-
-        <hr style="border:0;border-top:1px solid var(--border);margin:12px 0" />
-
-        <h3>🔤 Layout</h3>
-        <div class="g3">
-          <div class="row"><span class="hint">QR size (mm)</span><input id="qrmm" class="sizeInput" type="number" value="60" min="10" step="1"></div>
-          <div class="row"><span class="hint">Gap QR→Code (mm)</span><input id="gapCode" class="sizeInput" type="number" value="5" min="0" step="0.5"></div>
-          <div class="row"><span class="hint">Gap Code→Caption (mm)</span><input id="gapCap" class="sizeInput" type="number" value="5" min="0" step="0.5"></div>
-        </div>
-        <div class="g3">
-          <div class="row"><span class="hint">Code font (pt)</span><input id="codePt" class="sizeInput" type="number" value="28" min="8" step="1"></div>
-          <div class="row"><span class="hint">Caption font (pt)</span><input id="capPt" class="sizeInput" type="number" value="22" min="8" step="1"></div>
-          <div class="row"><span class="hint">Qty per row</span><input id="qty" class="sizeInput" type="number" value="1" min="1" step="1"></div>
-        </div>
-
-        <div class="row" style="margin-top:10px;gap:10px">
-          <button id="btnPreview" class="btn secondary">👁️ Preview</button>
-          <button id="btnTest" class="btn secondary" disabled>🧾 Test Label</button>
-          <button id="btnPrintAll" class="btn" disabled>🖨️ Print All</button>
-        </div>
-
+    <div class="mt-3 flex items-center gap-2 text-sm">
+      <input id="lineToggle" type="checkbox" class="accent-cyan-400" />
+      <label>Code और Caption के बीच लाइन जोड़ें</label>
+    </div>
+    <div id="lineOptions" class="mt-2 grid grid-cols-2 gap-3 text-sm hidden">
+      <div>
+        <label>Line Thickness (px)</label>
+        <input id="lineThickness" type="number" value="1" min="0" class="glass rounded-xl px-2 py-1 w-full"/>
       </div>
-
-      <!-- RIGHT: data + preview -->
-      <div style="display:grid;gap:16px">
-        <div class="card">
-          <h3>📦 Data Source</h3>
-          <div class="row" style="flex-wrap:wrap;gap:10px">
-            <select id="dataMode" class="select">
-              <option value="builder" selected>Use QR Builder table</option>
-              <option value="import">Import Excel/CSV</option>
-              <option value="manual">Manual (one per line)</option>
-            </select>
-            <input id="fileImport" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
-            <button id="btnImport" class="btn secondary hidden">📥 Choose File</button>
-          </div>
-
-          <div id="manualBox" class="hidden" style="margin-top:10px">
-            <div class="hint">Format: <span class="mono">text_or_url | code | caption | qty</span> (code optional; qty default 1)</div>
-            <textarea id="manualText" class="textInput" style="width:100%;min-height:120px"></textarea>
-          </div>
-
-          <div id="dataInfo" class="row" style="margin-top:10px"><span class="pill">Rows: 0</span></div>
-        </div>
-
-        <div class="card">
-          <h3>🧩 Label Preview</h3>
-          <canvas id="labelPreview" width="800" height="600"></canvas>
-          <div class="hint" style="margin-top:6px">Preview is approximate; printer firmware may adjust pixels slightly.</div>
-        </div>
-
-        <div class="card">
-          <h3>📝 Job Summary</h3>
-          <div id="jobSummary" class="mono" style="font-size:.9rem;white-space:pre-wrap;line-height:1.3"></div>
-        </div>
+      <div>
+        <label>Line Color</label>
+        <input id="lineColor" type="color" value="#94a3b8" class="glass rounded-xl px-2 py-1 w-full"/>
+      </div>
+      <div>
+        <label>Line Length (% of QR)</label>
+        <input id="lineLength" type="number" value="100" min="10" max="120" class="glass rounded-xl px-2 py-1 w-full"/>
+      </div>
+      <div>
+        <label>Gap: Code→Line (mm)</label>
+        <input id="gapCodeLine" type="number" value="1" min="0" class="glass rounded-xl px-2 py-1 w-full"/>
+      </div>
+      <div>
+        <label>Gap: Line→Caption (mm)</label>
+        <input id="gapLineCaption" type="number" value="1" min="0" class="glass rounded-xl px-2 py-1 w-full"/>
       </div>
     </div>
-  </section>
+  </details>
 
-</div>
+  <hr class="my-4 border-white/10"/>
 
-<!-- ================== EXISTING BUILDER JS (unchanged logic) ================== -->
-<script>
-(() => {
-  const fileInput   = document.getElementById('fileInput');
-  const browseLabel = document.getElementById('browseLabel');
-  const processBtn  = document.getElementById('processBtn');
-  const resetBtn    = document.getElementById('resetBtn');
-  const zipBtn      = document.getElementById('zipBtn');
-  const zipTypeSel  = document.getElementById('zipType');
-  const excelBtn    = document.getElementById('excelBtn');
-  const csvBtn      = document.getElementById('csvBtn');
-  const dropZone    = document.getElementById('dropZone');
-  const fileListEl  = document.getElementById('fileList');
-  const origRow     = document.getElementById('origRow');
-  const enhRow      = document.getElementById('enhRow');
-  const outSizeEl   = document.getElementById('outSize');
-  const captionEl   = document.getElementById('captionInput');
-  const manualEl    = document.getElementById('manualInput');
-  const addManual   = document.getElementById('addManualBtn');
-  const dataPanel   = document.getElementById('dataPanel');
-  const tbody       = document.querySelector('#dataTable tbody');
+  <!-- Export buttons -->
+  <div class="flex flex-wrap gap-2">
+    <button id="exportExcel" class="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30">Export Excel</button>
+    <button id="exportCSV" class="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30">Export CSV</button>
+    <button id="exportPDF" class="px-3 py-2 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30">Export PDF</button>
+    <button id="downloadAll" class="px-3 py-2 rounded-xl bg-fuchsia-500/20 hover:bg-fuchsia-500/30">Download All</button>
+  </div>
 
-  let files = [];
-  let batchOutputs = []; // {link, code, caption, pngDataUrl, jpgDataUrl, svgText}
+  <p class="text-[11px] opacity-60 mt-3">Note: PNG/JPG रेंडरिंग आपकी DPI सेटिंग और px/mm conversion (96 DPI, 3.78 px/mm) के अनुसार होगी।</p>
+</section>
 
-  function setFiles(list){
-    files = Array.from(list || []);
-    fileListEl.textContent = files.length ? (files.length===1?files[0].name:`${files.length} files selected`) : 'No files selected';
-    const has = files.length>0;
-    processBtn.disabled = !has; resetBtn.disabled = !has;
-    zipBtn.disabled = true; excelBtn.disabled = true; csvBtn.disabled = true;
-    if (has) browseLabel.classList.add('off');
-  }
-  function resetAll(){
-    files=[]; batchOutputs=[];
-    fileInput.value=''; browseLabel.classList.remove('off');
-    processBtn.disabled=true; resetBtn.disabled=true;
-    zipBtn.disabled=true; excelBtn.disabled=true; csvBtn.disabled=true;
-    fileListEl.textContent='No files selected'; origRow.innerHTML=''; enhRow.innerHTML='';
-    dataPanel.hidden = true; tbody.innerHTML='';
-    manualEl.value=''; captionEl.value='';
-  }
+<!-- Right: Previews + Table -->
+<section class="lg:col-span-8 space-y-6">
+  <!-- Previews -->
+  <div class="glass rounded-2xl p-4 shadow-glow">
+    <h2 class="text-lg font-semibold mb-2">Preview</h2>
+    <div class="text-sm opacity-80 mb-3">ऊपर: सभी input QR • नीचे: Enhanced output (live)</div>
+    <div class="space-y-4">
+      <div id="inputRow" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+      <div id="outputRow" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+  </div>
 
-  browseLabel.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') fileInput.click(); });
-  fileInput.addEventListener('change', e=>{ setFiles(e.target.files); if(files.length){ resetBtn.disabled=false; }});
-  resetBtn.addEventListener('click', resetAll);
+  <!-- Data Table -->
+  <div class="glass rounded-2xl p-4 shadow-glow">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold">Data Table</h2>
+      <div class="text-xs opacity-70">Sr. No. • Code • Caption • FE No. • QR Link/Text</div>
+    </div>
+    <div id="tableWrap" class="overflow-auto scrollbar">
+      <table id="dataTable" class="w-full text-sm">
+        <thead class="text-left border-b border-white/10">
+          <tr class="opacity-80">
+            <th class="py-2 pr-2">Sr.</th>
+            <th class="py-2 pr-2">Code</th>
+            <th class="py-2 pr-2">Caption</th>
+            <th class="py-2 pr-2">FE No.</th>
+            <th class="py-2 pr-2">QR Link/Text</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
-  ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';dropZone.style.borderColor='#6366f1';}));
-  ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();dropZone.style.borderColor='rgba(99, 102, 241, 0.15)'; if(ev==='drop'&&!files.length){ setFiles(e.dataTransfer.files); resetBtn.disabled=false; }}));
+  </main>  <!-- Fonts for preview options -->  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Montserrat:wght@400;600;700&family=Nunito:wght@400;600;700&family=Roboto+Mono:wght@400;600;700&display=swap" rel="stylesheet">  <script>
+    // ---- Utilities ----
+    const mmToPx = (mm) => mm * 3.78; // assuming 96DPI
+    const ptToPx = (pt) => pt * (96 / 72);
 
-  processBtn.addEventListener('click', async ()=>{
-    if(!files.length) return;
-    if (!batchOutputs.length){ enhRow.innerHTML=''; dataPanel.hidden = true; tbody.innerHTML=''; }
-    zipBtn.disabled=true; excelBtn.disabled=true; csvBtn.disabled=true;
-    const size = Math.max(256, parseInt(outSizeEl.value||'1024',10));
-    const caption = captionEl.value||'';
-    for(const f of files){
-      const r = await handleOneFile(f,size,caption);
-      if(r){ batchOutputs.push(r); addRow(r); }
-    }
-    if(batchOutputs.length){ zipBtn.disabled=false; excelBtn.disabled=false; csvBtn.disabled=false; dataPanel.hidden=false; }
-  });
-
-  addManual.addEventListener('click', async ()=>{
-    const text = (manualEl.value||'').trim();
-    if(!text) return;
-    resetBtn.disabled = false;
-    const size = Math.max(256, parseInt(outSizeEl.value||'1024',10));
-    const caption = captionEl.value||'';
-    const r = await handleManualText(text, size, caption);
-    if(r){ batchOutputs.push(r); addRow(r);
-      const dataPanelEl=document.getElementById('dataPanel'); if(dataPanelEl.hidden){ dataPanelEl.hidden=false; }
-      document.getElementById('zipBtn').disabled=false; document.getElementById('excelBtn').disabled=false; document.getElementById('csvBtn').disabled=false;
-    }
-    manualEl.select();
-  });
-  manualEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addManual.click(); } });
-
-  zipBtn.addEventListener('click', async ()=>{
-    if(!batchOutputs.length) return;
-    const t = zipTypeSel.value;
-    const zip = new JSZip();
-    batchOutputs.forEach((it,i)=>{
-      const base = it.code || `NO-CODE-${i+1}`;
-      if(t==='png') zip.file(`${base}.png`, dataUrlToBlob(it.pngDataUrl));
-      else if(t==='jpg') zip.file(`${base}.jpg`, dataUrlToBlob(it.jpgDataUrl));
-      else if(t==='svg') zip.file(`${base}.svg`, it.svgText);
-    });
-    const blob = await zip.generateAsync({type:'blob'});
-    triggerDownload(blob, `qr_${t}.zip`);
-  });
-
-  excelBtn.addEventListener('click', ()=>{
-    if(!batchOutputs.length) return;
-    const rows = batchOutputs.map((it, i)=>({ "#": i+1, "Link": it.link, "Code": it.code, "Caption": it.caption }));
-    const ws = XLSX.utils.json_to_sheet(rows, {header:["#","Link","Code","Caption"]});
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "QR Data");
-    XLSX.writeFile(wb, "qr_data.xlsx");
-  });
-
-  csvBtn.addEventListener('click', ()=>{
-    if(!batchOutputs.length) return;
-    const header = ['#','Link','Code','Caption'];
-    const lines = [header.join(',')];
-    batchOutputs.forEach((it,i)=>lines.push([i+1, csvEscape(it.link), csvEscape(it.code), csvEscape(it.caption)].join(',')));
-    triggerDownload(new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'}), 'qr_data.csv');
-  });
-
-  function addRow(item){
-    const tr = document.createElement('tr');
-    const idx = tbody.children.length + 1;
-    tr.innerHTML = `<td>${idx}</td><td>${escapeHtml(item.link)}</td><td>${escapeHtml(item.code)}</td><td>${escapeHtml(item.caption)}</td>`;
-    tbody.appendChild(tr);
-  }
-
-  async function handleOneFile(file, size, caption){
-    const origTile=document.createElement('div'); origTile.className='tile';
-    origTile.innerHTML=`<div class="thumb"><span>Loading…</span></div><div class="name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>`;
-    origRow.appendChild(origTile);
-    try{
-      const img=await loadImage(await fileToDataURL(file));
-      const {canvas,ctx}=makeCanvas(img.naturalWidth||img.width,img.naturalHeight||img.height);
-      ctx.drawImage(img,0,0);
-      const prev=new Image(); prev.alt='Original'; prev.src=canvas.toDataURL('image/jpeg',0.85);
-      origTile.querySelector('.thumb').innerHTML=''; origTile.querySelector('.thumb').appendChild(prev);
-
-      const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
-      const qr=jsQR(imageData.data,imageData.width,imageData.height,{inversionAttempts:'attemptBoth'});
-      if(!qr||!qr.data){ const s=document.createElement('div'); s.className='status err'; s.textContent='No QR found'; origTile.appendChild(s); return null; }
-
-      const link = qr.data || '';
-      const code = extractSixAlphaAfterEquals(link) || 'NO-CODE';
-      return await buildAndAppendEnhanced(link, size, code, caption);
-    }catch(e){
-      const s=document.createElement('div'); s.className='status err'; s.textContent='Error processing'; origTile.appendChild(s);
-      return null;
-    }
-  }
-
-  async function handleManualText(text, size, caption){
-    const origTile=document.createElement('div'); origTile.className='tile';
-    const short = text.length>60 ? text.slice(0,57)+'…' : text;
-    origTile.innerHTML=`<div class="thumb"><div style="padding:12px;text-align:center;color:#cbd5e1;font-size:12px;line-height:1.4">From text/URL</div></div><div class="name" title="${escapeHtml(text)}">${escapeHtml(short)}</div>`;
-    origRow.appendChild(origTile);
-    const link = text;
-    const code = extractSixAlphaAfterEquals(link) || 'NO-CODE';
-    return await buildAndAppendEnhanced(link, size, code, caption);
-  }
-
-  async function buildAndAppendEnhanced(link, size, code, caption){
-    const outs = await buildOutputsLargeTextWithOuterMargin(link, size, code, caption);
-    const enhTile=document.createElement('div'); enhTile.className='tile';
-    const enhThumb=document.createElement('div'); enhThumb.className='thumb';
-    const imgOut=new Image(); imgOut.alt='Enhanced'; imgOut.src=outs.pngDataUrl; enhThumb.appendChild(imgOut);
-    const name=document.createElement('div'); name.className='name'; name.textContent=`Code: ${code}`;
-    const links=document.createElement('div'); links.className='links';
-    links.appendChild(makeLink(outs.pngDataUrl, `${code}.png`, 'PNG'));
-    links.appendChild(makeLink(outs.jpgDataUrl, `${code}.jpg`, 'JPG'));
-    const svgBlob=new Blob([outs.svgText],{type:'image/svg+xml'}); const svgUrl=URL.createObjectURL(svgBlob);
-    links.appendChild(makeLink(svgUrl, `${code}.svg`, 'SVG'));
-    enhTile.appendChild(enhThumb); enhTile.appendChild(name); enhTile.appendChild(links); enhRow.appendChild(enhTile);
-    return { link, code, caption, pngDataUrl:outs.pngDataUrl, jpgDataUrl:outs.jpgDataUrl, svgText:outs.svgText };
-  }
-
-  function extractSixAlphaAfterEquals(s){
-    const i=s.lastIndexOf('='); if(i<0) return '';
-    const tail=s.slice(i+1);
-    const m=tail.match(/[A-Za-z]{6}/);
-    return m?m[0]:'';
-  }
-
-  async function buildOutputsLargeTextWithOuterMargin(text, size, code, caption){
-    const qr=qrcode(0,'M'); qr.addData(text); qr.make();
-    const qrSvgOnly=qr.createSvgTag({cellSize:8, margin:0});
-    const mmToPx=mm=>Math.round(mm*96/25.4);
-    const outerPad = mmToPx(3);
-    const gapCodePx    = code? mmToPx(5):0;
-    const gapCaptionPx = caption? mmToPx(5):0;
-
-    const codeFontPx    = Math.max(18, Math.round(size*0.22));
-    const captionFontPx = Math.max(16, Math.round(size*0.16));
-    const dashStroke    = Math.max(2, Math.round(size*0.02));
-
-    let innerH = size;
-    if(code){ innerH += gapCodePx + codeFontPx; }
-    if(caption){ innerH += gapCaptionPx + captionFontPx + Math.max(6, dashStroke*2); }
-
-    const W = size + 2*outerPad;
-    const H = innerH + 2*outerPad;
-
-    let y = outerPad;
-    const cx = outerPad + size/2;
-
-    const parts=[];
-    parts.push(`<rect width="100%" height="100%" fill="#ffffff"/>`);
-    parts.push(`<g transform="translate(${outerPad},${outerPad})">${scaleEmbeddedSvg(qrSvgOnly,size,size)}</g>`);
-    y += size;
-
-    if(code){
-      y += gapCodePx;
-      parts.push(`<text x="${cx}" y="${y + codeFontPx*0.8}" text-anchor="middle"
-        font-family="Arial, Helvetica, sans-serif" font-size="${codeFontPx}" font-weight="700"
-        letter-spacing="${Math.round(size*0.01)}" fill="#000000">${escapeXml(code)}</text>`);
-      y += codeFontPx;
+    function extractCodeFromLink(text) {
+      // Finds last 6 alphabetic letters after '=' at the end or before separators
+      // Examples: ...=ABCDEF -> ABCDEF | ...=abc123 (ignored) | ...=ZZZZZZ&x=y -> ZZZZZZ
+      const match = text.match(/=([A-Za-z]{6})(?![A-Za-z0-9])/);
+      return match ? match[1] : '';
     }
 
-    if(caption){
-      const dashW = Math.round(size*0.75);
-      const x1= outerPad + (size-dashW)/2, x2 = x1 + dashW;
-      const dashArray = Math.round(size*0.04);
-      y += gapCaptionPx;
-      parts.push(`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#000" stroke-width="${dashStroke}" stroke-dasharray="${dashArray},${dashArray}" />`);
-      y += Math.max(6, dashStroke*2);
-      parts.push(`<text x="${cx}" y="${y + captionFontPx*0.85}" text-anchor="middle"
-        font-family="Arial, Helvetica, sans-serif" font-size="${captionFontPx}" font-weight="700"
-        fill="#000000">${escapeXml(caption)}</text>`);
-      y += captionFontPx;
+    function downloadBlob(filename, dataUrl) {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
 
-    const svgText =
-`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  ${parts.join('\n  ')}
-</svg>`;
-
-    const pngDataUrl = await raster(svgText, W, H, 'image/png');
-    const jpgDataUrl = await raster(svgText, W, H, 'image/jpeg');
-    return { svgText, pngDataUrl, jpgDataUrl };
-  }
-
-  function scaleEmbeddedSvg(innerSvg, targetW, targetH){
-    const content=innerSvg.replace(/^<svg[^>]*>/i,'').replace(/<\/svg>\s*$/i,'');
-    const natural=parseQrNaturalSize(innerSvg)||100;
-    const scale=targetW/natural;
-    return `<g transform="scale(${scale})">${content}</g>`;
-  }
-  function parseQrNaturalSize(svg){
-    const vb=svg.match(/viewBox="([^"]+)"/i);
-    if(vb){ const p=vb[1].split(/\s+|,/).map(Number); return Math.max(p[2]||0,p[3]||0)||100; }
-    const w=svg.match(/width="(\\d+)"/i); if(w) return parseInt(w[1],10);
-    return 100;
-  }
-  function raster(svgMarkup,w,h,mime){
-    return new Promise((resolve,reject)=>{
-      const url=URL.createObjectURL(new Blob([svgMarkup],{type:'image/svg+xml'}));
-      const img=new Image();
-      img.onload=()=>{ const c=document.createElement('canvas'); c.width=w; c.height=h;
-        const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
-        ctx.imageSmoothingEnabled=false; ctx.drawImage(img,0,0,w,h);
-        URL.revokeObjectURL(url); try{ resolve(c.toDataURL(mime,0.95)); }catch(e){ reject(e); } };
-      img.onerror=(e)=>{ URL.revokeObjectURL(url); reject(e); };
-      img.src=url;
-    });
-  }
-  function triggerDownload(blob, filename){
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1500);
-  }
-  function dataUrlToBlob(dataUrl){
-    const parts=dataUrl.split(','), mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream';
-    const b=atob(parts[1]); const u8=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u8[i]=b.charCodeAt(i);
-    return new Blob([u8],{type:mime});
-  }
-  function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onerror=()=>rej(r.error); r.onload=()=>res(r.result); r.readAsDataURL(file); }); }
-  function loadImage(src){ return new Promise((res,rej)=>{ const img=new Image(); img.decoding='async'; img.onload=()=>res(img); img.onerror=rej; img.src=src; }); }
-  function makeCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; const ctx=c.getContext('2d'); return {canvas:c, ctx}; }
-  function makeLink(href,filename,label){ const a=document.createElement('a'); a.href=href; a.download=filename; a.className='dl'; a.textContent=label; return a; }
-  function escapeHtml(s){ return String(s).replace(/[&<>\"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-  function escapeXml(s){ return String(s).replace(/[&<>\"']/g, m=>({'&':'&amp;','<':'&gt;','>':'&gt;','"':'&quot;',"'":"&apos;"}[m])); }
-  function csvEscape(s){ if(s==null) return ''; const t=String(s).replace(/"/g,'""'); return /[",\n]/.test(t)?`"${t}"`:t; }
-
-  // expose ONLY table reader for Printer tab (no mutation)
-  window.__qr_readBuilderRows = function(){
-    const rows=[];
-    document.querySelectorAll('#dataTable tbody tr').forEach(tr=>{
-      const tds = tr.querySelectorAll('td');
-      if(tds.length>=4){
-        rows.push({
-          link: tds[1].innerText || '',
-          code: tds[2].innerText || '',
-          caption: tds[3].innerText || '',
-          qty: 1
-        });
-      }
-    });
-    return rows;
-  };
-})();
-</script>
-
-<!-- ================== PRINTER TAB JS (new) ================== -->
-<script>
-(() => {
-  // Tabs
-  const tabBtnBuilder = document.getElementById('tabBtnBuilder');
-  const tabBtnPrinter = document.getElementById('tabBtnPrinter');
-  const tabBuilder    = document.getElementById('tab-builder');
-  const tabPrinter    = document.getElementById('tab-printer');
-  function activateTab(which){
-    if(which==='builder'){
-      tabBtnBuilder.classList.add('active'); tabBtnPrinter.classList.remove('active');
-      tabBuilder.classList.remove('hidden'); tabPrinter.classList.add('hidden');
-      window.scrollTo({top:0,behavior:'smooth'});
-    }else{
-      tabBtnPrinter.classList.add('active'); tabBtnBuilder.classList.remove('active');
-      tabPrinter.classList.remove('hidden'); tabBuilder.classList.add('hidden');
-      window.scrollTo({top:0,behavior:'smooth'});
-      refreshJobSummary();
+    function svgToDataURL(svgNode) {
+      const serializer = new XMLSerializer();
+      const svgStr = serializer.serializeToString(svgNode);
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
     }
-  }
-  tabBtnBuilder.onclick=()=>activateTab('builder');
-  tabBtnPrinter.onclick=()=>activateTab('printer');
 
-  // ===== Elements
-  const ddlLang = document.getElementById('ddlLang');
-  const btnQzConnect = document.getElementById('btnQzConnect');
-  const btnQzRefresh = document.getElementById('btnQzRefresh');
-  const ddlPrinters  = document.getElementById('ddlPrinters');
-  const qzStatus     = document.getElementById('qzStatus');
-
-  const lbWmm = document.getElementById('lbWmm');
-  const lbHmm = document.getElementById('lbHmm');
-  const dpi   = document.getElementById('dpi');
-  const gapmm = document.getElementById('gapmm');
-  const speed = document.getElementById('speed');
-  const dark  = document.getElementById('dark');
-  const rotate= document.getElementById('rotate');
-  const mLR   = document.getElementById('mLR');
-  const mTB   = document.getElementById('mTB');
-
-  const shape = document.getElementById('shape');
-  const border= document.getElementById('border');
-  const radiusmm = document.getElementById('radiusmm');
-
-  const qrmm  = document.getElementById('qrmm');
-  const gapCode = document.getElementById('gapCode');
-  const gapCap  = document.getElementById('gapCap');
-  const codePt  = document.getElementById('codePt');
-  const capPt   = document.getElementById('capPt');
-  const qty     = document.getElementById('qty');
-
-  const btnPreview = document.getElementById('btnPreview');
-  const btnTest    = document.getElementById('btnTest');
-  const btnPrintAll= document.getElementById('btnPrintAll');
-
-  const dataMode   = document.getElementById('dataMode');
-  const btnImport  = document.getElementById('btnImport');
-  const fileImport = document.getElementById('fileImport');
-  const manualBox  = document.getElementById('manualBox');
-  const manualText = document.getElementById('manualText');
-  const dataInfo   = document.getElementById('dataInfo');
-
-  const previewCanvas = document.getElementById('labelPreview');
-  const jobSummaryEl  = document.getElementById('jobSummary');
-
-  // ===== Helpers
-  const mm2dots = (mm, dpiVal)=> Math.round((mm/25.4) * dpiVal);
-  const pt2dots = (pt, dpiVal)=> Math.round((pt/72) * dpiVal);
-  function status(msg, ok=false, warn=false){
-    qzStatus.innerHTML = `<span class="${ok?'ok':warn?'warn':'pill'}">${msg}</span>`;
-  }
-
-  // ===== QZ Tray
-  let qzConnected = false;
-  async function qzConnect(){
-    try{
-      if(window.qz && qz.websocket){
-        await qz.websocket.connect();
-        qzConnected = true;
-        status('Connected to QZ Tray', true);
-        btnQzRefresh.disabled = false;
-        btnTest.disabled = ddlPrinters.value ? false : true;
-        btnPrintAll.disabled = ddlPrinters.value ? false : true;
-      }else{
-        status('qz-tray.js not loaded', false, true);
-        alert('QZ Tray script not available. Check internet or allow the script.');
-      }
-    }catch(e){
-      status('QZ connect failed', false, true);
-      alert('QZ connect failed: ' + (e.message || e));
-    }
-  }
-  async function qzListPrinters(){
-    if(!qzConnected) return;
-    try{
-      const list = await qz.printers.find();
-      ddlPrinters.innerHTML = '';
-      list.forEach(p=>{
-        const opt=document.createElement('option'); opt.value=p; opt.textContent=p; ddlPrinters.appendChild(opt);
+    function renderSVGtoCanvas(svgNode, pxSize, mimeType = 'image/png', dpi = 300) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = pxSize; canvas.height = pxSize;
+          const ctx = canvas.getContext('2d');
+          // white background for JPG
+          if (mimeType === 'image/jpeg') {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+          }
+          ctx.drawImage(img, 0, 0, pxSize, pxSize);
+          // Set DPI via metadata is not standard cross-browser; use pixel size to achieve resolution.
+          canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            resolve(url);
+          }, mimeType, 1);
+        };
+        img.onerror = reject;
+        img.src = svgToDataURL(svgNode);
       });
-      ddlPrinters.disabled = list.length===0;
-      btnTest.disabled = list.length===0;
-      btnPrintAll.disabled = list.length===0;
-      status(`Printers found: ${list.length}`, true);
-    }catch(e){
-      status('Could not list printers', false, true);
-      alert('List printers error: ' + (e.message || e));
     }
-  }
-  btnQzConnect.onclick = qzConnect;
-  btnQzRefresh.onclick = qzListPrinters;
-  ddlPrinters.onchange = ()=>{ btnTest.disabled = !ddlPrinters.value; btnPrintAll.disabled = !ddlPrinters.value; };
 
-  // ===== Data source
-  let rowsData = []; // {text, code, caption, qty}
-  dataMode.addEventListener('change', ()=>{
-    const mode = dataMode.value;
-    if(mode==='builder'){
-      btnImport.classList.add('hidden'); fileImport.classList.add('hidden'); manualBox.classList.add('hidden');
-      rowsData = (window.__qr_readBuilderRows? window.__qr_readBuilderRows():[]).map(r=>({
-        text: r.link||'', code: r.code||'', caption: r.caption||'', qty: 1
-      }));
-    }else if(mode==='import'){
-      btnImport.classList.remove('hidden'); fileImport.classList.add('hidden'); manualBox.classList.add('hidden');
-      rowsData = [];
-    }else{
-      btnImport.classList.add('hidden'); fileImport.classList.add('hidden'); manualBox.classList.remove('hidden');
-      rowsData = [];
+    // ---- State ----
+    const state = {
+      entries: [], // { id, fileName, inputUrl, text, code, caption, fe, qr, svgNode, domRefs }
+      options: {
+        size: 256, sizeUnit: 'px', dpi: 300,
+        code: { font: 'Inter', sizePt: 12, weight: 700, style: 'normal', color: '#e8eef9', gapMM: 2 },
+        cap: { font: 'Inter', sizePt: 10, weight: 400, style: 'normal', color: '#c7d2fe', gapMM: 1.5 },
+        line: { enabled: false, thickness: 1, color: '#94a3b8', lengthPct: 100, gapCodeMM: 1, gapCapMM: 1 }
+      },
+      globalCaption: ''
+    };
+
+    // ---- DOM refs ----
+    const fileInput = document.getElementById('fileInput');
+    const inputRow = document.getElementById('inputRow');
+    const outputRow = document.getElementById('outputRow');
+    const tableBody = document.getElementById('tableBody');
+
+    // Controls
+    const qrSizeValue = document.getElementById('qrSizeValue');
+    const qrSizeUnit = document.getElementById('qrSizeUnit');
+    const dpiInput = document.getElementById('dpi');
+
+    const codeFont = document.getElementById('codeFont');
+    const codeFontSize = document.getElementById('codeFontSize');
+    const codeWeight = document.getElementById('codeWeight');
+    const codeStyle = document.getElementById('codeStyle');
+    const codeColor = document.getElementById('codeColor');
+    const gapCode = document.getElementById('gapCode');
+
+    const capFont = document.getElementById('capFont');
+    const capFontSize = document.getElementById('capFontSize');
+    const capWeight = document.getElementById('capWeight');
+    const capStyle = document.getElementById('capStyle');
+    const capColor = document.getElementById('capColor');
+    const gapCaption = document.getElementById('gapCaption');
+
+    const lineToggle = document.getElementById('lineToggle');
+    const lineOptions = document.getElementById('lineOptions');
+    const lineThickness = document.getElementById('lineThickness');
+    const lineColor = document.getElementById('lineColor');
+    const lineLength = document.getElementById('lineLength');
+    const gapCodeLine = document.getElementById('gapCodeLine');
+    const gapLineCaption = document.getElementById('gapLineCaption');
+
+    const globalCaption = document.getElementById('globalCaption');
+
+    const exportExcel = document.getElementById('exportExcel');
+    const exportCSV = document.getElementById('exportCSV');
+    const exportPDF = document.getElementById('exportPDF');
+    const downloadAll = document.getElementById('downloadAll');
+
+    // ---- Event wiring ----
+    function setLiveHandlers() {
+      const change = () => { readControlsIntoState(); rerenderAll(); };
+      [qrSizeValue, qrSizeUnit, dpiInput,
+       codeFont, codeFontSize, codeWeight, codeStyle, codeColor, gapCode,
+       capFont, capFontSize, capWeight, capStyle, capColor, gapCaption,
+       lineToggle, lineThickness, lineColor, lineLength, gapCodeLine, gapLineCaption,
+       globalCaption
+      ].forEach(el => el.addEventListener('input', change));
+
+      lineToggle.addEventListener('change', () => {
+        lineOptions.classList.toggle('hidden', !lineToggle.checked);
+        change();
+      });
     }
-    refreshJobSummary();
-  });
-  // init
-  dataMode.dispatchEvent(new Event('change'));
 
-  btnImport.onclick = ()=> fileImport.click();
-  fileImport.addEventListener('change', async (e)=>{
-    const f = e.target.files[0]; if(!f) return;
-    const buf = await f.arrayBuffer();
-    if(f.name.endsWith('.csv')){
-      const text = new TextDecoder().decode(new Uint8Array(buf));
-      rowsData = parseCsv(text);
-    }else{
-      const wb = XLSX.read(buf, {type:'array'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const arr = XLSX.utils.sheet_to_json(ws, {defval:''});
-      rowsData = arr.map(r=>({
-        text: r.Link || r.Text || r.URL || r.url || r.text || '',
-        code: r.Code || r.code || '',
-        caption: r.Caption || r.caption || '',
-        qty: Number(r.Qty || r.qty || 1) || 1
-      }));
+    function readControlsIntoState() {
+      state.options.size = parseFloat(qrSizeValue.value || '256');
+      state.options.sizeUnit = qrSizeUnit.value;
+      state.options.dpi = parseInt(dpiInput.value || '300');
+
+      state.options.code.font = codeFont.value;
+      state.options.code.sizePt = parseFloat(codeFontSize.value || '12');
+      state.options.code.weight = parseInt(codeWeight.value);
+      state.options.code.style = codeStyle.value;
+      state.options.code.color = codeColor.value;
+      state.options.code.gapMM = parseFloat(gapCode.value || '0');
+
+      state.options.cap.font = capFont.value;
+      state.options.cap.sizePt = parseFloat(capFontSize.value || '10');
+      state.options.cap.weight = parseInt(capWeight.value);
+      state.options.cap.style = capStyle.value;
+      state.options.cap.color = capColor.value;
+      state.options.cap.gapMM = parseFloat(gapCaption.value || '0');
+
+      state.options.line.enabled = lineToggle.checked;
+      state.options.line.thickness = parseFloat(lineThickness.value || '1');
+      state.options.line.color = lineColor.value;
+      state.options.line.lengthPct = parseFloat(lineLength.value || '100');
+      state.options.line.gapCodeMM = parseFloat(gapCodeLine.value || '0');
+      state.options.line.gapCapMM = parseFloat(gapLineCaption.value || '0');
+
+      state.globalCaption = globalCaption.value || '';
     }
-    refreshJobSummary();
-  });
 
-  manualText.addEventListener('input', ()=>{
-    const lines = manualText.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    rowsData = lines.map(line=>{
-      const parts = line.split('|').map(s=>s.trim());
-      return {
-        text: parts[0]||'',
-        code: parts[1]||extractSix(parts[0])||'',
-        caption: parts[2]||'',
-        qty: Number(parts[3]||1)||1
+    // ---- Core: create output SVG (QR + code + optional line + caption) ----
+    async function buildOutputSVG(entry) {
+      const opts = state.options;
+      const pxSize = opts.sizeUnit === 'mm' ? Math.round(mmToPx(opts.size)) : Math.round(opts.size);
+
+      // 1) Make QR SVG using qr-code-styling
+      const qr = new QRCodeStyling({
+        type: 'svg', data: entry.text || ' ', width: pxSize, height: pxSize,
+        margin: 0, qrOptions: { typeNumber: 0, errorCorrectionLevel: 'M' },
+        dotsOptions: { type: 'square', color: '#000' },
+        backgroundOptions: { color: '#ffffff' }
+      });
+      const qrWrapper = document.createElement('div');
+      await qr.append(qrWrapper);
+      const qrSvg = qrWrapper.querySelector('svg');
+
+      // 2) Compose a new SVG that stacks: QR -> gap -> code -> optional line -> gap -> caption
+      const codeText = entry.code || '';
+      const capText = (entry.caption ?? state.globalCaption || '') + (entry.fe ? String(entry.fe) : '');
+
+      // Measure text height (approx) using pt to px
+      const codePx = ptToPx(opts.code.sizePt);
+      const capPx = ptToPx(opts.cap.sizePt);
+
+      const gapCodePx = Math.round(mmToPx(opts.code.gapMM));
+      const gapBetweenCodeAndLine = Math.round(mmToPx(opts.line.gapCodeMM));
+      const gapBetweenLineAndCap = Math.round(mmToPx(opts.line.gapCapMM));
+      const gapCapPx = Math.round(mmToPx(opts.cap.gapMM));
+
+      let extraHeight = gapCodePx + codePx + gapCapPx + capPx;
+      let lineHeight = 0;
+      if (opts.line.enabled) {
+        lineHeight = opts.line.thickness;
+        extraHeight += gapBetweenCodeAndLine + lineHeight + gapBetweenLineAndCap;
+      }
+
+      const totalW = pxSize;
+      const totalH = pxSize + extraHeight;
+
+      // Container SVG
+      const out = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      out.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      out.setAttribute('width', totalW);
+      out.setAttribute('height', totalH);
+      out.setAttribute('viewBox', 0 0 ${totalW} ${totalH});
+      out.style.background = '#ffffff';
+
+      // import QR group
+      const gQR = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      gQR.innerHTML = qrSvg.outerHTML; // safe here since created by library
+      out.appendChild(gQR);
+
+      // Y cursor starts after QR
+      let y = pxSize + gapCodePx;
+
+      // Code text
+      if (codeText) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(totalW / 2));
+        text.setAttribute('y', String(y + codePx));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', opts.code.color);
+        text.setAttribute('font-family', opts.code.font);
+        text.setAttribute('font-size', opts.code.sizePt + 'pt');
+        text.setAttribute('font-weight', String(opts.code.weight));
+        text.setAttribute('font-style', opts.code.style);
+        text.textContent = codeText;
+        out.appendChild(text);
+        y += codePx;
+      }
+
+      // Optional line
+      if (opts.line.enabled) {
+        y += gapBetweenCodeAndLine;
+        const lineLen = Math.min(1.2, Math.max(0.1, opts.line.lengthPct / 100)) * totalW;
+        const x1 = (totalW - lineLen) / 2;
+        const x2 = x1 + lineLen;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', String(x1));
+        line.setAttribute('x2', String(x2));
+        line.setAttribute('y1', String(y + lineHeight / 2));
+        line.setAttribute('y2', String(y + lineHeight / 2));
+        line.setAttribute('stroke', opts.line.color);
+        line.setAttribute('stroke-width', String(lineHeight));
+        out.appendChild(line);
+        y += lineHeight + gapBetweenLineAndCap;
+      }
+
+      // Caption text
+      if (capText) {
+        y += gapCapPx;
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(totalW / 2));
+        text.setAttribute('y', String(y + capPx));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', opts.cap.color);
+        text.setAttribute('font-family', opts.cap.font);
+        text.setAttribute('font-size', opts.cap.sizePt + 'pt');
+        text.setAttribute('font-weight', String(opts.cap.weight));
+        text.setAttribute('font-style', opts.cap.style);
+        text.textContent = capText;
+        out.appendChild(text);
+        y += capPx;
+      }
+
+      entry.svgNode = out;
+      return out;
+    }
+
+    // ---- Renderers ----
+    function addInputPreview(entry) {
+      const card = document.createElement('div');
+      card.className = 'glass rounded-xl p-2 flex flex-col gap-2 items-center';
+      const img = document.createElement('img');
+      img.src = entry.inputUrl;
+      img.alt = entry.fileName;
+      img.className = 'w-full aspect-square object-contain rounded-lg bg-white';
+      const cap = document.createElement('div');
+      cap.className = 'text-xs opacity-75 truncate w-full text-center';
+      cap.textContent = entry.fileName;
+      card.appendChild(img); card.appendChild(cap);
+      inputRow.appendChild(card);
+      entry.domRefs = entry.domRefs || {};
+      entry.domRefs.inputCard = card;
+    }
+
+    function addOutputPreview(entry) {
+      const card = document.createElement('div');
+      card.className = 'glass rounded-2xl p-3 flex flex-col gap-2';
+
+      const mount = document.createElement('div');
+      mount.className = 'w-full rounded-lg overflow-hidden bg-white flex items-center justify-center';
+
+      const btnRow = document.createElement('div');
+      btnRow.className = 'flex flex-wrap gap-2 mt-2';
+
+      const chip = document.createElement('div');
+      chip.className = 'chip px-2 py-1 rounded-full text-xs self-start';
+      chip.textContent = 'Code: ' + (entry.code || '-');
+
+      const btnSVG = document.createElement('button');
+      btnSVG.className = 'px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-sm';
+      btnSVG.textContent = 'Download SVG';
+
+      const btnPNG = document.createElement('button');
+      btnPNG.className = 'px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-sm';
+      btnPNG.textContent = 'Download PNG';
+
+      const btnJPG = document.createElement('button');
+      btnJPG.className = 'px-3 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-sm';
+      btnJPG.textContent = 'Download JPG';
+
+      btnRow.append(btnSVG, btnPNG, btnJPG);
+      card.append(mount, btnRow, chip);
+      outputRow.appendChild(card);
+
+      entry.domRefs = entry.domRefs || {};
+      entry.domRefs.outputMount = mount;
+      entry.domRefs.btnSVG = btnSVG;
+      entry.domRefs.btnPNG = btnPNG;
+      entry.domRefs.btnJPG = btnJPG;
+      entry.domRefs.codeChip = chip;
+    }
+
+    async function renderOutput(entry) {
+      if (!entry.domRefs || !entry.domRefs.outputMount) return;
+      entry.domRefs.outputMount.innerHTML = '';
+      const svg = await buildOutputSVG(entry);
+      entry.domRefs.outputMount.appendChild(svg);
+      entry.domRefs.codeChip.textContent = 'Code: ' + (entry.code || '-');
+
+      // Wire download buttons
+      const getPxSize = () => state.options.sizeUnit === 'mm' ? Math.round(mmToPx(state.options.size)) : Math.round(state.options.size);
+      entry.domRefs.btnSVG.onclick = () => {
+        const dataUrl = svgToDataURL(svg);
+        const name = (entry.code || 'qr') + '.svg';
+        downloadBlob(name, dataUrl);
       };
-    });
-    refreshJobSummary();
-  });
+      entry.domRefs.btnPNG.onclick = async () => {
+        const url = await renderSVGtoCanvas(svg, getPxSize(), 'image/png', state.options.dpi);
+        const a = document.createElement('a');
+        a.href = url; a.download = (entry.code || 'qr') + '.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      };
+      entry.domRefs.btnJPG.onclick = async () => {
+        const url = await renderSVGtoCanvas(svg, getPxSize(), 'image/jpeg', state.options.dpi);
+        const a = document.createElement('a');
+        a.href = url; a.download = (entry.code || 'qr') + '.jpg';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      };
+    }
 
-  function parseCsv(csv){
-    const out=[]; const lines=csv.split(/\r?\n/);
-    const header = (lines[0]||'').split(',').map(s=>s.trim());
-    const idx = {
-      text: header.findIndex(h=>/^(link|text|url)$/i.test(h)),
-      code: header.findIndex(h=>/^code$/i.test(h)),
-      caption: header.findIndex(h=>/^caption$/i.test(h)),
-      qty: header.findIndex(h=>/^(qty|quantity)$/i.test(h)),
-    };
-    for(let i=1;i<lines.length;i++){
-      if(!lines[i].trim()) continue;
-      const cols = splitCsvLine(lines[i]);
-      out.push({
-        text: idx.text>=0 ? cols[idx.text] : cols[0] || '',
-        code: idx.code>=0 ? cols[idx.code] : '',
-        caption: idx.caption>=0 ? cols[idx.caption] : '',
-        qty: Number(idx.qty>=0 ? cols[idx.qty] : 1) || 1
+    function rerenderAll() {
+      state.entries.forEach(renderOutput);
+    }
+
+    // ---- Table ----
+    function refreshTable() {
+      tableBody.innerHTML = '';
+      state.entries.forEach((e, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-t border-white/5 hover:bg-white/5';
+        const tdSr = <td class="py-2 pr-2">${idx + 1}</td>;
+        const tdCode = <td class="py-2 pr-2">${e.code || '-'}</td>;
+        const tdCaption = document.createElement('td');
+        tdCaption.className = 'py-2 pr-2';
+        const capInput = document.createElement('input');
+        capInput.type = 'text';
+        capInput.value = e.caption ?? '';
+        capInput.placeholder = '(auto)';
+        capInput.className = 'glass rounded-lg px-2 py-1 w-40';
+        capInput.addEventListener('input', () => { e.caption = capInput.value; renderOutput(e); });
+        tdCaption.appendChild(capInput);
+
+        const tdFe = document.createElement('td');
+        tdFe.className = 'py-2 pr-2';
+        const feInput = document.createElement('input');
+        feInput.type = 'text'; feInput.value = e.fe ?? ''; feInput.placeholder = '1';
+        feInput.className = 'glass rounded-lg px-2 py-1 w-16';
+        feInput.addEventListener('input', () => { e.fe = feInput.value; renderOutput(e); });
+        tdFe.appendChild(feInput);
+
+        const tdText = <td class="py-2 pr-2 text-ellipsis">${e.text.replaceAll('<','&lt;')}</td>;
+
+        tr.innerHTML = tdSr + tdCode + tdText;
+        // Insert editable tds at correct positions
+        tr.insertBefore(tdCaption, tr.children[2]);
+        tr.insertBefore(tdFe, tr.children[3]);
+        tableBody.appendChild(tr);
       });
     }
-    return out;
-  }
-  function splitCsvLine(s){
-    const r=[]; let cur='', q=false;
-    for(let i=0;i<s.length;i++){
-      const ch=s[i];
-      if(ch==='"' ){ if(q&&s[i+1]==='"'){cur+='"'; i++;} else q=!q; }
-      else if(ch===',' && !q){ r.push(cur); cur=''; }
-      else cur+=ch;
-    }
-    r.push(cur); return r.map(x=>x.trim());
-  }
-  function extractSix(text){
-    const i=text.lastIndexOf('='); if(i<0) return '';
-    const m=text.slice(i+1).match(/[A-Za-z]{6}/);
-    return m?m[0]:'';
-  }
 
-  function refreshJobSummary(){
-    document.getElementById('dataInfo').innerHTML = `<span class="pill">Rows: ${rowsData.length}</span>`;
-    const total = rowsData.reduce((a,b)=>a+(b.qty||1),0);
-    jobSummaryEl.textContent = `Mode: ${dataMode.value}\nRows: ${rowsData.length}\nTotal labels: ${total}\nLanguage: ${ddlLang.value}\nLabel: ${lbWmm.value}×${lbHmm.value} mm @ ${dpi.value} dpi`;
-  }
+    // ---- Decode uploaded images ----
+    async function decodeImageFile(file) {
+      const url = URL.createObjectURL(file);
+      try {
+        // If SVG, try to pull the embedded text (fallback to raster decode by drawing)
+        if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
+          const txt = await (await fetch(url)).text();
+          // naive: search for QR data embedded – often not present. Fallback below.
+        }
 
-  // ===== Preview
-  btnPreview.onclick = drawPreview;
-  function drawPreview(){
-    const ctx = previewCanvas.getContext('2d');
-    const W = previewCanvas.width = mm2dots(Number(lbWmm.value), Number(dpi.value));
-    const H = previewCanvas.height= mm2dots(Number(lbHmm.value), Number(dpi.value));
-    // white canvas
-    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+        const img = document.createElement('img');
+        img.decoding = 'async'; img.src = url;
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
 
-    const padX = mm2dots(Number(mLR.value), Number(dpi.value));
-    const padY = mm2dots(Number(mTB.value), Number(dpi.value));
-    const qrSize = mm2dots(Number(qrmm.value), Number(dpi.value));
-    const gap1 = mm2dots(Number(gapCode.value), Number(dpi.value));
-    const gap2 = mm2dots(Number(gapCap.value), Number(dpi.value));
-
-    // border/shape
-    const b = Number(border.value)||0;
-    const r = mm2dots(Number(radiusmm.value), Number(dpi.value));
-    ctx.strokeStyle='#000'; ctx.lineWidth=b||1;
-    if(shape.value==='square'){
-      ctx.strokeRect(padX, padY, W-2*padX, H-2*padY);
-    }else if(shape.value==='rounded'){
-      roundRect(ctx, padX, padY, W-2*padX, H-2*padY, r); ctx.stroke();
+        // Use ZXing to decode
+        const reader = new ZXingBrowser.BrowserQRCodeReader();
+        const result = await reader.decodeFromImage(img);
+        return { text: result.text, inputUrl: url };
+      } catch (err) {
+        console.warn('Decode failed for', file.name, err);
+        return { text: '', inputUrl: url };
+      }
     }
 
-    // QR render (SVG → image)
-    const first = rowsData[0] || { text: 'https://example.com?x=ABCDEF', code: 'ABCDEF', caption:'Sample' };
-    const qr = qrcode(0, 'M'); qr.addData(first.text||''); qr.make();
-    const qrSvg = qr.createSvgTag({cellSize:6, margin:0});
-    const img = new Image();
-    img.onload = ()=>{
-      // place QR centered at top inside padding
-      const x = Math.round((W - qrSize)/2);
-      let y = padY;
-      ctx.imageSmoothingEnabled=false;
-      ctx.drawImage(img, x, y, qrSize, qrSize);
-      // code text
-      y += qrSize + gap1;
-      ctx.fillStyle='#000';
-      ctx.font = `${pt2dots(Number(codePt.value), Number(dpi.value))}px Arial`;
-      ctx.textAlign='center';
-      ctx.fillText(first.code||extractSix(first.text)||'', Math.round(W/2), y);
-      // caption
-      y += pt2dots(Number(codePt.value), Number(dpi.value)) + gap2;
-      ctx.font = `${pt2dots(Number(capPt.value), Number(dpi.value))}px Arial`;
-      ctx.fillText(first.caption||'', Math.round(W/2), y);
-    };
-    // rasterize svg for preview
-    const url = URL.createObjectURL(new Blob([qrSvg], {type:'image/svg+xml'}));
-    img.src = url;
-    setTimeout(()=>URL.revokeObjectURL(url), 2000);
-  }
-  function roundRect(ctx, x, y, w, h, r){
-    r = Math.min(r, w/2, h/2);
-    ctx.beginPath();
-    ctx.moveTo(x+r, y);
-    ctx.lineTo(x+w-r, y);
-    ctx.arcTo(x+w, y, x+w, y+r, r);
-    ctx.lineTo(x+w, y+h-r);
-    ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
-    ctx.lineTo(x+r, y+h);
-    ctx.arcTo(x, y+h, x, y+h-r, r);
-    ctx.lineTo(x, y+r);
-    ctx.arcTo(x, y, x+r, y, r);
-    ctx.closePath();
-  }
-
-  // ===== Command builders
-  function buildTSPL(row){
-    const d = Number(dpi.value);
-    const W = mm2dots(Number(lbWmm.value), d);
-    const H = mm2dots(Number(lbHmm.value), d);
-    const g = mm2dots(Number(gapmm.value), d);
-    const px = mm2dots(Number(mLR.value), d);
-    const py = mm2dots(Number(mTB.value), d);
-    const qr = mm2dots(Number(qrmm.value), d);
-    const gap1 = mm2dots(Number(gapCode.value), d);
-    const gap2 = mm2dots(Number(gapCap.value), d);
-    const borderDots = Number(border.value)||0;
-    const radius = mm2dots(Number(radiusmm.value), d);
-    const codeSize = pt2dots(Number(codePt.value), d);
-    const capSize  = pt2dots(Number(capPt.value), d);
-    const rot = Number(rotate.value);
-
-    // TSPL font scale guess (approx): use TTF bitmap scaling via TEXT 0,0 + scaling
-    const fx = Math.max(1, Math.round(codeSize/24));
-    const fy = fx;
-    const fx2= Math.max(1, Math.round(capSize/24));
-    const fy2= fx2;
-
-    let y = py;
-    let cmds = [];
-    cmds.push(`SIZE ${W},${H}`);
-    cmds.push(`GAP ${g},0`);
-    if (Number(speed.value)) cmds.push(`SPEED ${Number(speed.value)}`);
-    if (Number(dark.value)>=0) cmds.push(`DENSITY ${Number(dark.value)}`);
-    cmds.push(`DIRECTION 1`);
-    cmds.push(`REFERENCE 0,0`);
-    cmds.push(`CLS`);
-
-    // border
-    if(shape.value==='square'){
-      cmds.push(`BOX ${px},${py},${W-px},${H-py},${borderDots||1}`);
-    }else if(shape.value==='rounded'){
-      // TSPL has no native rounded BOX; draw 4 lines + 4 arcs via BAR/ELLIPSE workaround (simple: skip rounded here)
-      cmds.push(`BOX ${px},${py},${W-px},${H-py},${borderDots||1}`);
+    async function handleFiles(files) {
+      const list = Array.from(files).filter(f => /image\/.+|\.svg$/i.test(f.type) || /\.svg$/i.test(f.name));
+      for (const file of list) {
+        const { text, inputUrl } = await decodeImageFile(file);
+        const code = extractCodeFromLink(text || '');
+        const entry = { id: crypto.randomUUID(), fileName: file.name, inputUrl, text: text || '', code, caption: undefined, fe: '' };
+        state.entries.push(entry);
+        addInputPreview(entry);
+        addOutputPreview(entry);
+        await renderOutput(entry);
+      }
+      refreshTable();
     }
 
-    // QR
-    const qx = Math.round((W - qr)/2);
-    cmds.push(`QRCODE ${qx},${y},M,${Math.max(3, Math.round(qr/24))},A,${rot/90},M2,S1,"${escapeTSPL(row.text||'')}"`);
-    y += qr + gap1;
+    // Drag & drop
+    document.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+    document.addEventListener('drop', (e)=>{ e.preventDefault(); if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files); });
 
-    // Code
-    const codeStr = (row.code || extractSix(row.text||'') || '').toString();
-    if(codeStr){
-      // Use TEXT x,y,font,rotation,xscale,yscale,"str"
-      cmds.push(`TEXT ${Math.round(W/2)},${y},"0",${rot/90},${fx},${fy},"${escapeTSPLCenter(codeStr)}"`);
-      y += codeSize + gap2;
-    }
+    fileInput.addEventListener('change', (e)=> handleFiles(e.target.files));
 
-    // Caption
-    if(row.caption){
-      cmds.push(`TEXT ${Math.round(W/2)},${y},"0",${rot/90},${fx2},${fy2},"${escapeTSPLCenter(row.caption)}"`);
-    }
+    // Global caption propagate
+    globalCaption.addEventListener('input', () => { rerenderAll(); });
 
-    // Quantity
-    const q = Number(row.qty||1);
-    cmds.push(`PRINT ${q}`);
+    // Export handlers
+    exportExcel.addEventListener('click', () => {
+      const rows = state.entries.map((e, i) => ({
+        'Sr. No.': i+1,
+        'Code': e.code || '',
+        'Caption': (e.caption ?? state.globalCaption || '') + (e.fe ? String(e.fe) : ''),
+        'FE No.': e.fe || '',
+        'QR link/text': e.text || ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'QR Data');
+      XLSX.writeFile(wb, 'qr-data.xlsx');
+    });
 
-    return cmds.join('\n') + '\n';
-  }
-  function escapeTSPL(s){ return (s||'').replace(/"/g, '""'); }
-  function escapeTSPLCenter(s){ return escapeTSPL(s); } // centered: handled by setting x at mid with ALIGN? TSPL TEXT is left-origin; many printers support CENTER; to keep simple we place approx center.
+    exportCSV.addEventListener('click', () => {
+      const rows = [['Sr. No.','Code','Caption','FE No.','QR link/text']];
+      state.entries.forEach((e,i)=>{
+        rows.push([i+1, e.code || '', (e.caption ?? state.globalCaption || '') + (e.fe ? String(e.fe) : ''), e.fe || '', e.text || '']);
+      });
+      const csv = rows.map(r=> r.map(v=> '"'+String(v).replaceAll('"','""')+'"').join(',')).join('\n');
+      const url = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+      downloadBlob('qr-data.csv', url);
+    });
 
-  function buildZPL(row){
-    const d = Number(dpi.value);
-    const W = mm2dots(Number(lbWmm.value), d);
-    const H = mm2dots(Number(lbHmm.value), d);
-    const px = mm2dots(Number(mLR.value), d);
-    const py = mm2dots(Number(mTB.value), d);
-    const qr = mm2dots(Number(qrmm.value), d);
-    const gap1 = mm2dots(Number(gapCode.value), d);
-    const gap2 = mm2dots(Number(gapCap.value), d);
-    const borderDots = Number(border.value)||0;
-    const radius = Math.min(8, Math.round((mm2dots(Number(radiusmm.value), d) / Math.min(W,H)) * 8)); // ZPL ^GB roundness 0-8
-    const codeDots = pt2dots(Number(codePt.value), d);
-    const capDots  = pt2dots(Number(capPt.value), d);
-    const rot = Number(rotate.value);
+    exportPDF.addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const data = state.entries.map((e,i)=>[
+        i+1,
+        e.code || '',
+        (e.caption ?? state.globalCaption || '') + (e.fe ? String(e.fe) : ''),
+        e.fe || '',
+        e.text || ''
+      ]);
+      doc.text('QR Data', 40, 40);
+      doc.autoTable({ startY: 60, head: [['Sr. No.','Code','Caption','FE No.','QR link/text']], body: data, styles: { fontSize: 9 }});
+      doc.save('qr-data.pdf');
+    });
 
-    let y = py;
-    let z = '^XA';
-    z += `^PW${W}^LL${H}`;
-    // border
-    if(shape.value==='square'){
-      z += `^FO${px},${py}^GB${W-2*px},${H-2*py},${borderDots},B,0^FS`;
-    }else if(shape.value==='rounded'){
-      z += `^FO${px},${py}^GB${W-2*px},${H-2*py},${borderDots},B,${radius}^FS`;
-    }
+    downloadAll.addEventListener('click', async () => {
+      // Bundle as individual downloads; for large batches consider Zip (JSZip) – omitted to keep size small
+      for (const e of state.entries) {
+        await renderOutput(e);
+        const svg = e.svgNode;
+        const base = e.code || 'qr';
+        downloadBlob(base + '.svg', svgToDataURL(svg));
+        const px = state.options.sizeUnit === 'mm' ? Math.round(mmToPx(state.options.size)) : Math.round(state.options.size);
+        const pngUrl = await renderSVGtoCanvas(svg, px, 'image/png', state.options.dpi);
+        const a1 = document.createElement('a'); a1.href = pngUrl; a1.download = base + '.png'; document.body.appendChild(a1); a1.click(); a1.remove(); setTimeout(()=>URL.revokeObjectURL(pngUrl), 1000);
+        const jpgUrl = await renderSVGtoCanvas(svg, px, 'image/jpeg', state.options.dpi);
+        const a2 = document.createElement('a'); a2.href = jpgUrl; a2.download = base + '.jpg'; document.body.appendChild(a2); a2.click(); a2.remove(); setTimeout(()=>URL.revokeObjectURL(jpgUrl), 1000);
+      }
+    });
 
-    // QR: ^BQN,2,magn  + LA prefix
-    const qx = Math.round((W - qr)/2);
-    const magn = Math.max(2, Math.round(qr/50)); // heuristic
-    z += `^FO${qx},${y}^BQN,2,${magn}^FDLA,${escapeZPL(row.text||'')}^FS`;
-    y += qr + gap1;
+    // Theme toggle (simple demo)
+    document.getElementById('darkToggle').addEventListener('change', (e)=>{
+      document.body.style.background = e.target.checked ? 'radial-gradient(1200px 600px at 10% 10%, #0b1220, #0a0f1a 45%, #070b13)' : '#f5f7fb';
+    });
 
-    // Code text
-    const codeStr = (row.code || extractSix(row.text||'') || '').toString();
-    if(codeStr){
-      z += `^FO${Math.round(W/2)},${y}^FB${W},1,0,C,0^A0N,${codeDots},${codeDots}^FD${escapeZPL(codeStr)}^FS`;
-      y += codeDots + gap2;
-    }
-    // Caption
-    if(row.caption){
-      z += `^FO${Math.round(W/2)},${y}^FB${W},1,0,C,0^A0N,${capDots},${capDots}^FD${escapeZPL(row.caption)}^FS`;
-    }
-
-    // copies
-    const q = Number(row.qty||1);
-    z += `^PQ${q}\n^XZ`;
-    return z;
-  }
-  function escapeZPL(s){
-    return (s||'').replace(/[\^~\\]/g, ch=>({ '^':'\\^','~':'\\~','\\':'\\\\' }[ch]));
-  }
-
-  function buildEPL(row){
-    const d = Number(dpi.value);
-    const W = mm2dots(Number(lbWmm.value), d);
-    const H = mm2dots(Number(lbHmm.value), d);
-    const px = mm2dots(Number(mLR.value), d);
-    const py = mm2dots(Number(mTB.value), d);
-    const qr = mm2dots(Number(qrmm.value), d);
-    const gap1 = mm2dots(Number(gapCode.value), d);
-    const gap2 = mm2dots(Number(gapCap.value), d);
-    const borderDots = Number(border.value)||0;
-    const codeDots = pt2dots(Number(codePt.value), d);
-    const capDots  = pt2dots(Number(capPt.value), d);
-
-    let y = py;
-    let e = '';
-    e += `N\n`;              // clear
-    e += `q${W}\n`;          // label width
-    e += `Q${H},${gapmm.value?mm2dots(Number(gapmm.value), d):0}\n`; // form len, gap
-
-    // border (EPL has BOX x,y,w,h,thickness)
-    if(shape.value==='square'){
-      e += `BOX ${px},${py},${W-2*px},${H-2*py},${borderDots||1}\n`;
-    }
-
-    // QR in EPL: use BARCODE QR? Many EPL variants use BQ; fallback via ZPL-compatible printers prefer ZPL mode.
-    // We'll put a simple 2D code using "b" (PDF417) not ideal; so here we raster QR as graphic (GW):
-    const qrSVG = qrcode(0,'M'); qrSVG.addData(row.text||''); qrSVG.make();
-    const svg = qrSVG.createSvgTag({cellSize:6, margin:0});
-    // We cannot easily raster to GW offline here; for demo keep placeholder text + rely on ZPL/TSPL for production.
-    // Put text to indicate (users with EPL should switch to ZPL/TSPL mode on LP-46 Trio).
-    e += `A${Math.round(W/2)},${y},0,4,1,1,C,"[QR not native in EPL demo]"\n`;
-    y += qr + gap1;
-
-    const codeStr = (row.code || extractSix(row.text||'') || '').toString();
-    if(codeStr){
-      e += `A${Math.round(W/2)},${y},0,4,1,1,C,"${codeStr}"\n`;
-      y += codeDots + gap2;
-    }
-    if(row.caption){
-      e += `A${Math.round(W/2)},${y},0,3,1,1,C,"${row.caption}"\n`;
-    }
-    const q = Number(row.qty||1);
-    e += `P${q}\n`;
-    return e;
-  }
-
-  // ===== Print actions
-  btnTest.onclick = async ()=>{
-    if(!ddlPrinters.value) return alert('Select a printer first.');
-    const sample = rowsData[0] || { text:'https://example.com?x=ABCDEF', code:'ABCDEF', caption:'Sample', qty:1 };
-    const cmd = buildForLang(sample);
-    await sendRaw(cmd);
-  };
-  btnPrintAll.onclick = async ()=>{
-    if(!ddlPrinters.value) return alert('Select a printer first.');
-    for(const row of rowsData){
-      const cmd = buildForLang(row);
-      // per row send
-      await sendRaw(cmd);
-    }
-    alert('Sent all labels to printer.');
-  };
-  function buildForLang(row){
-    const lang = ddlLang.value;
-    if(lang==='TSPL') return buildTSPL(row);
-    if(lang==='ZPL')  return buildZPL(row);
-    return buildEPL(row);
-  }
-  async function sendRaw(dataStr){
-    if(!qzConnected){ await qzConnect(); }
-    if(!qzConnected) throw new Error('QZ not connected');
-    const cfg = qz.configs.create(ddlPrinters.value, { encoding: 'UTF-8' });
-    const data = [{ type:'raw', format:'command', data: dataStr }];
-    try{
-      await qz.print(cfg, data);
-      status('Printed ✔️', true);
-    }catch(e){
-      status('Print failed', false, true);
-      alert('Print error: ' + (e.message||e));
-    }
-  }
-})();
-</script>
-
-</body>
+    // Init
+    setLiveHandlers();
+    readControlsIntoState();
+  </script></body>
 </html>
